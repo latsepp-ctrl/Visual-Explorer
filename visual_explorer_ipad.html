@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Explorer</title>
+  <!-- Inline styles for portability on devices like iPad -->
+  <style>
+    /* Reset basic styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #fafafa;
+      color: #333;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    header {
+      padding: 15px 10px;
+      background-color: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: normal;
+      margin-bottom: 5px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .controls label {
+      font-size: 14px;
+    }
+
+    select, button {
+      padding: 6px 10px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background-color: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #f0f0f0;
+    }
+
+    .categories-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Category sections take full width but are hidden by default.
+     * The JavaScript adds the "active" class to display the current section.
+     */
+    .category-section {
+      width: 100%;
+      padding: 20px;
+      display: none;
+    }
+
+    .category-section.active {
+      display: block;
+    }
+
+    .category-title {
+      font-size: 20px;
+      margin-bottom: 15px;
+      text-transform: capitalize;
+      font-weight: bold;
+    }
+
+    .images-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+    }
+
+    .images-grid img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 8px;
+      background-color: #eee;
+    }
+
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      background-color: #fff;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .nav-btn {
+      background-color: #f5f5f5;
+      border: none;
+      padding: 10px 15px;
+      font-size: 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .nav-btn:hover {
+      background-color: #e0e0e0;
+    }
+
+    /* Lightbox overlay styles */
+    .lightbox {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .lightbox img {
+      max-width: 90%;
+      max-height: 90%;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+
+    .lightbox-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 32px;
+      color: #fff;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+    }
+
+    .lightbox-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 40px;
+      color: #fff;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 20px;
+      user-select: none;
+    }
+
+    .lightbox-prev {
+      left: 20px;
+    }
+
+    .lightbox-next {
+      right: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Visual Explorer</h1>
+      <div class="controls">
+        <label for="imgCount">Number of Images:</label>
+        <select id="imgCount">
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="30">30</option>
+        </select>
+        <button id="refreshBtn">Refresh</button>
+      </div>
+    </header>
+
+    <div id="categoriesContainer" class="categories-container">
+      <!-- Sections will be injected here -->
+    </div>
+
+    <!-- Lightbox overlay for full-screen image viewing -->
+    <div id="lightbox" class="lightbox hidden" aria-modal="true" role="dialog">
+      <button id="lightboxClose" class="lightbox-close" aria-label="Close full screen">&times;</button>
+      <button id="lightboxPrev" class="lightbox-nav lightbox-prev" aria-label="Previous image">&#8592;</button>
+      <img id="lightboxImage" src="" alt="Full-size view">
+      <button id="lightboxNext" class="lightbox-nav lightbox-next" aria-label="Next image">&#8594;</button>
+    </div>
+
+    <div class="nav-buttons">
+      <button id="prevBtn" class="nav-btn" aria-label="Previous category">&#8592;</button>
+      <button id="nextBtn" class="nav-btn" aria-label="Next category">&#8594;</button>
+    </div>
+  </div>
+
+  <!-- Inline script to make the page self-contained. -->
+  <script>
+    /*!
+     * Visual Explorer script for iPad. This self-contained file embeds the
+     * JavaScript and CSS directly in the HTML, ensuring that it opens easily
+     * on mobile devices like iPad without external resource dependencies. The
+     * images come from royalty-free Pexels photos and public-domain clip art
+     * sources【512814185937555†L18-L26】【808690557062601†L160-L187】.
+     */
+    const categories = [
+      { id: 'animals' },
+      { id: 'musical' },
+      { id: 'appliances' },
+      { id: 'fruits' },
+      { id: 'vehicles' },
+      { id: 'nature' },
+      { id: 'shapes' },
+      { id: 'sports' }
+    ];
+
+    const imagesMap = {
+      // High‑quality animal photos from Pexels and Wikimedia Commons
+      animals: [
+        'https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg',
+        'https://images.pexels.com/photos/406014/pexels-photo-406014.jpeg',
+        'https://images.pexels.com/photos/1805164/pexels-photo-1805164.jpeg',
+        'https://images.pexels.com/photos/1851164/pexels-photo-1851164.jpeg',
+        'https://images.pexels.com/photos/1254140/pexels-photo-1254140.jpeg',
+        'https://images.pexels.com/photos/58997/pexels-photo-58997.jpeg',
+        'https://upload.wikimedia.org/wikipedia/commons/3/3a/Cat03.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/5/50/Vulpes_vulpes_laying_in_snow.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/9/9a/Giraffa_camelopardalis_reticulata.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/5/56/African_Bush_Elephant.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/a/a6/Toco_toucan_Ramphastos_toco.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/8/86/Ruby-throated_Hummingbird_2.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/2/2d/Siberian_Tiger_Panthera_tigris_altaica.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/9/9e/Red_fox_kit_crop.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/1/18/Brown_horse_on_field.jpg'
+      ],
+      // Musical instruments: open‑clipart icons and photos
+      musical: [
+        'https://upload.wikimedia.org/wikipedia/commons/4/4d/Acoustic_guitar.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/3/39/Drums.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/f/f5/Violin_01.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/8/8d/Trumpet.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/6/6e/Accordion.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/2/22/Piano_keyboard.svg',
+        'https://images.pexels.com/photos/164936/pexels-photo-164936.jpeg',
+        'https://images.pexels.com/photos/210854/pexels-photo-210854.jpeg',
+        'https://images.pexels.com/photos/164743/pexels-photo-164743.jpeg',
+        'https://images.pexels.com/photos/207962/pexels-photo-207962.jpeg'
+      ],
+      // Household appliances: photos and clip‑art icons
+      appliances: [
+        'https://images.pexels.com/photos/2724748/pexels-photo-2724748.jpeg',
+        'https://images.pexels.com/photos/3735481/pexels-photo-3735481.jpeg',
+        'https://images.pexels.com/photos/2181471/pexels-photo-2181471.jpeg',
+        'https://images.pexels.com/photos/162793/pexels-photo-162793.jpeg',
+        'https://upload.wikimedia.org/wikipedia/commons/5/5c/Toaster.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/9/90/Microwave_oven.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/2/2f/Blue_vacuum_cleaner.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/f/ff/Kettle_icon.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/0/09/Hand-mixer.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/a/a7/Coffe_maker.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/6/60/Italian-coffee-maker.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/5/53/Washing-machine.svg'
+      ],
+      // Fruits and vegetables
+      fruits: [
+        'https://images.pexels.com/photos/264537/pexels-photo-264537.jpeg',
+        'https://images.pexels.com/photos/13308395/pexels-photo-13308395.jpeg',
+        'https://images.pexels.com/photos/33083467/pexels-photo-33083467.jpeg',
+        'https://upload.wikimedia.org/wikipedia/commons/8/8a/Banana-Single.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/a/ae/Citrus_sinensis_orange.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/1/15/Red_Apple.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/7/74/Carrot.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/2/29/Sweet_cherry.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/2/2c/Mango.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/1/11/Vitis_vinifera_Riesling_grapes.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/7/70/Avocado.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/c/cd/Pineapple_and_cross_section.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/2/29/PerfectStrawberry.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/3/35/Watermelon_cross_BNC.jpg'
+      ],
+      // Vehicles: photos and icons
+      vehicles: [
+        'https://images.pexels.com/photos/164634/pexels-photo-164634.jpeg',
+        'https://images.pexels.com/photos/120049/pexels-photo-120049.jpeg',
+        'https://images.pexels.com/photos/337909/pexels-photo-337909.jpeg',
+        'https://images.pexels.com/photos/1545743/pexels-photo-1545743.jpeg',
+        'https://images.pexels.com/photos/70912/pexels-photo-70912.jpeg',
+        'https://upload.wikimedia.org/wikipedia/commons/b/bf/Sedan-car.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/9/9b/Bicycle_icon.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/2/2c/Bus_grey.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/3/3e/Airplane_silhouette.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/4/41/Train_icon.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/4/49/Sailboat_icon.svg'
+      ],
+      // Nature
+      nature: [
+        'https://images.pexels.com/photos/414171/pexels-photo-414171.jpeg',
+        'https://images.pexels.com/photos/462149/pexels-photo-462149.jpeg',
+        'https://images.pexels.com/photos/349758/pexels-photo-349758.jpeg',
+        'https://images.pexels.com/photos/414144/pexels-photo-414144.jpeg',
+        'https://images.pexels.com/photos/417173/pexels-photo-417173.jpeg',
+        'https://upload.wikimedia.org/wikipedia/commons/5/5c/Clouds_over_lake.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/2/2b/Mushrooms_in_forest.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/8/86/Waterfall_Blossom.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/7/7f/Mountain_lake_scenery.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/5/50/Flower_field.jpg'
+      ],
+      // Sports & games
+      sports: [
+        'https://upload.wikimedia.org/wikipedia/commons/c/c6/WP20Symbols_BASKETBALL.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/6/6a/Basketball.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/5/5c/Soccerball.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/1/1e/Tennis_ball.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/3/36/Baseball.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/3/3f/Football_american.svg',
+        'https://upload.wikimedia.org/wikipedia/commons/e/e4/Cricket_ball.svg'
+      ]
+    };
+
+    const container = document.getElementById('categoriesContainer');
+    const imgCountSelect = document.getElementById('imgCount');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    // Elements for the lightbox overlay
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImage');
+    const lightboxPrev = document.getElementById('lightboxPrev');
+    const lightboxNext = document.getElementById('lightboxNext');
+    const lightboxClose = document.getElementById('lightboxClose');
+
+    // Variables to track the current list of images and the index for the lightbox
+    let currentImgList = [];
+    let currentImgIndex = 0;
+    // Index of the current category being displayed
+    let currentIndex = 0;
+
+    /**
+     * Show only the section corresponding to the given index. All other
+     * sections are hidden. This replaces reliance on CSS scroll-snap for
+     * improved compatibility on devices like iPad.
+     * @param {number} index - The index of the section to display.
+     */
+    function showSection(index) {
+      const sections = container.querySelectorAll('.category-section');
+      sections.forEach((section, i) => {
+        if (i === index) {
+          section.classList.add('active');
+        } else {
+          section.classList.remove('active');
+        }
+      });
+    }
+
+    // currentIndex is declared above
+
+    function createSection(category) {
+      const section = document.createElement('section');
+      section.className = 'category-section';
+      section.dataset.category = category.id;
+
+      const title = document.createElement('h2');
+      title.className = 'category-title';
+      title.textContent = category.id.replace(/-/g, ' ');
+      section.appendChild(title);
+
+      const grid = document.createElement('div');
+      grid.className = 'images-grid';
+      section.appendChild(grid);
+
+      return section;
+    }
+
+    function loadImagesForSection(section, count) {
+      const catId = section.dataset.category;
+      const grid = section.querySelector('.images-grid');
+      grid.innerHTML = '';
+
+      if (catId === 'shapes') {
+        for (let i = 0; i < count; i++) {
+          const img = document.createElement('img');
+          const randomColour = Math.floor(Math.random() * 0xffffff)
+            .toString(16)
+            .padStart(6, '0');
+          img.src = `https://via.placeholder.com/400x300/${randomColour}/ffffff.png?text=%23${randomColour}`;
+          img.alt = `colour block #${randomColour}`;
+          grid.appendChild(img);
+        }
+        return;
+      }
+
+      const list = imagesMap[catId] || [];
+      // Create a shuffled copy to minimise immediate repetition
+      const shuffled = [...list];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      // Build the list of images to show: use unique items first, then repeat if count > list length
+      const imagesToShow = [];
+      if (count <= shuffled.length) {
+        imagesToShow.push(...shuffled.slice(0, count));
+      } else {
+        imagesToShow.push(...shuffled);
+        while (imagesToShow.length < count) {
+          const randIndex = Math.floor(Math.random() * shuffled.length);
+          imagesToShow.push(shuffled[randIndex]);
+        }
+      }
+      imagesToShow.forEach((src, idx) => {
+        const img = document.createElement('img');
+        img.src = src || 'https://via.placeholder.com/400x300?text=No+Image';
+        img.alt = `${catId} image ${idx + 1}`;
+        grid.appendChild(img);
+      });
+    }
+
+    function loadAllSections(count) {
+      const sections = container.querySelectorAll('.category-section');
+      sections.forEach(section => {
+        loadImagesForSection(section, count);
+      });
+    }
+
+    function init() {
+      categories.forEach(cat => {
+        const section = createSection(cat);
+        container.appendChild(section);
+      });
+      loadAllSections(parseInt(imgCountSelect.value, 10));
+
+      // Display the first section
+      showSection(currentIndex);
+
+      // Add a click listener to the container for image clicks (event delegation)
+      container.addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG') {
+          const section = e.target.closest('.category-section');
+          if (!section) return;
+          const imgs = Array.from(section.querySelectorAll('img'));
+          currentImgList = imgs.map(img => img.src);
+          currentImgIndex = imgs.indexOf(e.target);
+          openLightbox();
+        }
+      });
+
+      // Navigation and close handlers for the lightbox
+      lightboxPrev.addEventListener('click', () => navigateLightbox(-1));
+      lightboxNext.addEventListener('click', () => navigateLightbox(1));
+      lightboxClose.addEventListener('click', closeLightbox);
+
+      // Swipe support on the lightbox
+      let lbStartX = null;
+      lightbox.addEventListener('touchstart', (e) => {
+        lbStartX = e.touches[0].clientX;
+      });
+      lightbox.addEventListener('touchend', (e) => {
+        if (lbStartX === null) return;
+        const endX = e.changedTouches[0].clientX;
+        const delta = endX - lbStartX;
+        const threshold = 50;
+        if (Math.abs(delta) > threshold) {
+          navigateLightbox(delta > 0 ? -1 : 1);
+        }
+        lbStartX = null;
+      });
+    }
+
+
+    imgCountSelect.addEventListener('change', () => {
+      loadAllSections(parseInt(imgCountSelect.value, 10));
+    });
+    refreshBtn.addEventListener('click', () => {
+      loadAllSections(parseInt(imgCountSelect.value, 10));
+    });
+    prevBtn.addEventListener('click', () => {
+      if (currentIndex > 0) {
+        currentIndex--;
+        showSection(currentIndex);
+      }
+    });
+    nextBtn.addEventListener('click', () => {
+      if (currentIndex < categories.length - 1) {
+        currentIndex++;
+        showSection(currentIndex);
+      }
+    });
+
+    // Touch support for swiping on mobile devices
+    let startX = null;
+    container.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+    });
+    container.addEventListener('touchend', (e) => {
+      if (startX === null) return;
+      const endX = e.changedTouches[0].clientX;
+      const delta = endX - startX;
+      const threshold = 50;
+      if (Math.abs(delta) > threshold) {
+        if (delta > 0 && currentIndex > 0) {
+          currentIndex--;
+        } else if (delta < 0 && currentIndex < categories.length - 1) {
+          currentIndex++;
+        }
+        showSection(currentIndex);
+      }
+      startX = null;
+    });
+
+    init();
+
+    // Lightbox functions
+    function openLightbox() {
+      updateLightboxImage();
+      lightbox.classList.remove('hidden');
+    }
+
+    function closeLightbox() {
+      lightbox.classList.add('hidden');
+    }
+
+    function navigateLightbox(direction) {
+      if (!currentImgList || currentImgList.length === 0) return;
+      currentImgIndex = (currentImgIndex + direction + currentImgList.length) % currentImgList.length;
+      updateLightboxImage();
+    }
+
+    function updateLightboxImage() {
+      const src = currentImgList[currentImgIndex];
+      lightboxImg.src = src;
+    }
+  </script>
+</body>
+</html>

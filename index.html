@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Explorer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Visual Explorer</h1>
+      <div class="controls">
+        <label for="imgCount">Number of Images:</label>
+        <select id="imgCount">
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="30">30</option>
+        </select>
+        <button id="refreshBtn">Refresh</button>
+      </div>
+    </header>
+
+    <div id="categoriesContainer" class="categories-container">
+      <!-- Category sections will be injected here by script.js -->
+    </div>
+
+    <!-- Lightbox overlay for full-screen image viewing. Initially hidden. -->
+    <div id="lightbox" class="lightbox hidden" aria-modal="true" role="dialog">
+      <button id="lightboxClose" class="lightbox-close" aria-label="Close full screen">&times;</button>
+      <button id="lightboxPrev" class="lightbox-nav lightbox-prev" aria-label="Previous image">&#8592;</button>
+      <img id="lightboxImage" src="" alt="Full-size view">
+      <button id="lightboxNext" class="lightbox-nav lightbox-next" aria-label="Next image">&#8594;</button>
+    </div>
+
+    <div class="nav-buttons">
+      <button id="prevBtn" class="nav-btn" aria-label="Previous category">&#8592;</button>
+      <button id="nextBtn" class="nav-btn" aria-label="Next category">&#8594;</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
